@@ -8,48 +8,19 @@ import time # .sleep(), .time(), .time_ns()
 import argparse
 import numpy as np
 
-"""
-    Ideas:
-    - Statistical analysis
-"""
-
-ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_#'
-ALPHAS = [ALPHA, 'ABCDEFGHIJKLMNOPQRSTUVWXYZ_#0123456789', '_#0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ']
-
-parser = argparse.ArgumentParser(
-                    prog = 'crack',
-                    description = 'Crack the ciphers of ACry course',
-                    epilog = 'Cracking the cipher.')
+alpha = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_#'
+parser = argparse.ArgumentParser(prog = 'crack', description = 'Crack the ciphers of ACry course', epilog = 'Cracking the cipher.')
 parser.add_argument('path', help='the cipher to crack')      # option that takes a value
-
 parser.add_argument('-v', '--verbose', help='verbosity', action='store_true')
 parser.add_argument('-s', '--seq', help='count sequence of n chars', type=int, default=0)
-parser.add_argument('-f', '--freq', nargs='?', default='freq.data',  help='frequency table', type=str)  # on/off flag
-parser.add_argument('--digram', nargs='?', default='digram.data',  help='digram frequency table', type=str)  # on/off flag
+parser.add_argument('-f', '--freq', nargs='?', const=2, default=0,  help='frequency table', type=int) 
+parser.add_argument('--bigram', nargs='?', default='bigram.data',  help='bigram frequency table', type=str)
 parser.add_argument('-l', '--length', help='demo text length', default=100, type=int)
 args = parser.parse_args()
 
-def stats(text: str) -> None:
-    """
-        Statistical approach
-    """
-    freqtxt = get_freq(text)
-    freq = open(args.freq, 'r').read().rstrip()
-    digram = open(args.digram, 'r').read().rstrip().split('\n')
-    if type(freq) is not list:
-        freq = list(freq)
-    for i in range(0, len(freqtxt)):
-        if freqtxt[i] not in freq:
-            freq.append(freqtxt[i])
-        else:
-            print(freqtxt[i] + ' -> ' + (freq[i] if freq[i] != '\n' else '~'))
-
-    new = []
-    for c in text[:args.length]:
-        new.append(freq[freqtxt.index(c)])
-
-    print(''.join(new))
-
+frequency = " ETAOINSHRDLCUMWFGYPBVKJXQZ\n"
+bigram = ['TH','HE','IN','ER','AN','RE','ON','AT','EN','ND','TI','ES','OR','TE','OF','ED','IS','IT','AL','AR','ST','TO','NT','NG','SE','HA','AS','OU','IO','HE','LE','IN','VE','ER','CO','AN','ME','RE','DE','ON','HI','AT','RI','EN','RO','ND','IC','TI','NE','ES','EA','OR','RA','TE','CE']
+trigram = ['THE']
 
 def counter(d, k):
     if k not in d:
@@ -57,26 +28,41 @@ def counter(d, k):
     else:
         d[k] += 1
 
-def get_freq(text):
+def get_freq(text, seq=1, min_freq=0.00, exclude=''):
     """
         Get characters in a list ordered by frequency
     """
     chars = {}
     for i in range(0, len(text)):
-        if i-args.seq+1 >= 0:
-            counter(chars, text[i-args.seq+1:i+1])
-        else:
-            continue
+        if i-seq+1 >= 0:
+            t = text[i-seq+1:i+1]
+            if (exclude and exclude not in t) or not exclude:
+                counter(chars, t)
     ls = []
     for c in chars:
         ls.append([c, chars[c]])
     ls = sorted(ls, key=lambda x : x[1], reverse=True)
+    if min_freq > 0:
+        ls = filter(lambda x : (float(x[1]) / len(text)) >= min_freq, ls)
     if args.verbose:
         for x in ls:
             print(x[0] + ': ' + str(x[1]))
     ls = [x[0] for x in ls]
 
     return ls
+
+def stats(text: str) -> None:
+    """
+        Statistical approach
+    """
+    fqs = get_freq(text)
+    # Try to exclude one of the tops which should be space
+    for c in fqs:
+        bis = get_freq(text, seq=2, min_freq=0.02, exclude=c)
+        print(bis)
+        tris = get_freq(text, seq=3, min_freq=0.015, exclude=c)
+        print(tris)
+
 
 def main():
     text = ''.join(open(args.path, 'r').read().rstrip().split('\n'))
