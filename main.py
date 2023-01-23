@@ -1,5 +1,5 @@
 """
-    Cipher
+    Cipher cracker
 """
 import sys
 import os
@@ -14,6 +14,22 @@ import time # .sleep(), .time(), .time_ns()
 ALPHA = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_#'
 DEFAULT = '1.data'
 MOST_COMMON = 'ETAOINSHRDLUCWMFYGPBVKXJQZ'
+
+def stats(dct, repl):
+    """
+        Statistical approach
+    """
+    pass
+
+def modulo():
+    """
+        Modular
+    """
+
+def perm():
+    """
+        Permutator
+    """
 
 def count(d, k):
     if k not in d:
@@ -36,13 +52,16 @@ def main():
     file = open(path, 'r').read().rstrip()
     file = ''.join(file.split('\n'))
 
-    dct = {}
-    for c in file:
-        count(dct, c)
+    chars = {}
+    chars2 = {}
+    for i in range(0, len(file)):
+        count(chars, file[i])
+        if i > 0:
+            count(chars2, file[i-1:i+1])
 
     ls = []
-    for c in dct:
-        ls.append((c, dct[c]))
+    for c in chars:
+        ls.append((c, chars[c]))
 
     ls = sorted(ls, key=lambda x : x[1])
     for (c, v) in ls:
