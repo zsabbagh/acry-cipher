@@ -28,7 +28,7 @@ args = parser.parse_args()
 frequency = " ETAOINSHRDLCUMWFGYPBVKJXQZ\n"
 alphafreq = "ETAOINSHRDLCUMWFGYPBVKJXQZ"
 bigram = ['th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar','st','to','nt','ng','se','ha','as','ou','io','he','le','in','ve','er','co','an','me','re','de','on','hi','at','ri','en','ro','nd','ic','ti','ne','es','ea','or','ra','te','ce']
-trigrams = ['the', 'and', 'ing', 'her']
+trigrams = ['the', 'and', 'ing', 'her', 'hat', 'his', 'tha', 'ere', 'for', 'ent', 'ion', 'ter', 'was']
 expected_frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001, 0.120]
 expected_frequency = [0.0] * 10 + expected_frequency + [0.0]
 for i in range(len(alpha)):
