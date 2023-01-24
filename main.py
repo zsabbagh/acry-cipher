@@ -34,7 +34,7 @@ def counter(d, k):
     else:
         d[k] += 1
 
-def get_freq(text, seq=1, min_freq=0.00, exclude=''):
+def get_freq(text, seq=1, min_freq=0.00, exclude='') -> list:
     """
         Get characters in a list ordered by frequency
     """
@@ -46,15 +46,21 @@ def get_freq(text, seq=1, min_freq=0.00, exclude=''):
                 counter(chars, t)
     ls = []
     for c in chars:
-        ls.append([c, chars[c]])
+        ls.append([c, chars[c] / float(len(text))])
     ls = sorted(ls, key=lambda x : x[1], reverse=True)
     if min_freq > 0:
-        ls = filter(lambda x : (float(x[1]) / len(text)) >= min_freq, ls)
-    if args.verbose:
-        for x in ls:
-            print(x[0] + ': ' + str(x[1]))
+        ls = filter(lambda x : float(x[1]) >= min_freq, ls)
     ls = [x[0] for x in ls]
+    return ls
 
+def get_freqtable(text) -> list:
+    """
+        Get characters in a list ordered by frequency
+    """
+    chars = {}
+    for i in range(0, len(text)):
+        counter(chars, text[i])
+    ls = [0.0] * len(alpha)
     return ls
 
 def intersect_elems(what: str, elems: list):
@@ -77,22 +83,57 @@ def gramalysis(fqs, bis, tris):
             for bi in bis:
                 pass
 
+def printcol(s, colour):
+    print('\033[' + str(colour) + 'm' + s + '\033[0m', end="")
+
 def stats(text: str) -> None:
     """
         Statistical approach
     """
     fqs = get_freq(text)
-    demo_text = text[:args.length]
     # Try to exclude one of the tops which should be space
+    mapper = {}
+    for a in alpha:
+        mapper[a] = a
     for c in fqs:
         print()
-        bis = get_freq(text, seq=2, min_freq=args.min, exclude=c)
-        tris = get_freq(text, seq=3, min_freq=args.min+0.05, exclude=c)
+        bis = get_freq(text, seq=2, min_freq=args.min)
+        tris = get_freq(text, seq=3, min_freq=args.min)
+        printcol("\nmin frequency = " + str(args.min), 7)
+        print("\n-- bigrams --")
+        print(bigram)
         print(bis)
+        print("\n-- trigrams --")
+        print(trigrams)
         print(tris)
+        if args.verbose:
+            for c in text[:args.length]:
+                if c in alpha:
+                    print('\033[31m' + c +'\033[0m', end="")
+                else:
+                    print('\033[33m' + c + '\033[0m', end="")
+            print()
         # One of the trigrams is most likely THE (or AND)
-        if args.question and input('\ncontinue? [empty string continues] '):
+        inp = input('\nreplace? [x-y replaces x with y, comma delimits, no ends]\n')
+        if inp != 'no':
+            inp = inp.split(',')
+            new = []
+            for e in inp:
+                e = e.split('-')
+                if len(e) > 1:
+                    mapper[e[0].upper()] = e[1].lower()
+                    new.append(e[0].upper())
+            text = list(text)
+            for i in range(len(text)):
+                if text[i].upper() != mapper[text[i].upper()]:
+                    text[i] = mapper[text[i].upper()]
+            text = ''.join(text)
+        else:
             break
+    print("\n--- Rules applied ---")
+    for k in mapper:
+        print(k + '-' + mapper[k], end=',')
+    
 
 def find_keylen(text: str, max_len: int) -> int:
     occ = []
@@ -118,8 +159,24 @@ def vigenere(text: str, max_len: int = 1000, key_len: int = 0) -> None:
         max_len = len(text)
     if not key_len:
         key_len = find_keylen(text, max_len)
-    print('Chosen key length is ' + str(key_len))
-        
+    print('Chosen key length is ', key_len)
+    # Add modulo
+    mods = [[]] * key_len
+    for i in range(len(text)):
+        mods[i % key_len].append(text[i])
+    mods = list(map(''.join, mods))
+    freqs = list(map(get_freq, mods))
+    # For each mod, check frequency and deviation from 
+    # Space starts frequency, then it is ABC... etc
+    frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001]
+    space = 0.120
+    # Assume numbers do not occur often, neither newline
+    frequency = np.array([0.0] * 10 + frequency + space + [0.0])
+    # Go through all characters
+    for i in range(key_len):
+        mod = mods[i]
+        for shift in range(len(alpha)):
+            pass
 
 def main():
     text = ''.join(open(args.path, 'r').read().rstrip().split('\n'))

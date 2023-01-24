@@ -1,13 +1,9 @@
-f = open('bigram', 'r').read().rstrip().replace('%','').replace('\n', ' ').split(' ')
+f = open('letter.data', 'r').read().rstrip().split('\n')
 
 l = []
 
-for i in range(1, len(f)):
-    if f[i-1] != '' and f[i] != '':
-        try:
-            l.append([f[i-1], float(f[i])])
-        except:
-            l.append([f[i], float(f[i-1])])
+for i in range(0, len(f)):
+    pass
 
 l = sorted(l, key=lambda x : x[1], reverse=True)
 
