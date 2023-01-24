@@ -27,8 +27,13 @@ args = parser.parse_args()
 
 frequency = " ETAOINSHRDLCUMWFGYPBVKJXQZ\n"
 alphafreq = "ETAOINSHRDLCUMWFGYPBVKJXQZ"
-bigram = ['TH','HE','IN','ER','AN','RE','ON','AT','EN','ND','TI','ES','OR','TE','OF','ED','IS','IT','AL','AR','ST','TO','NT','NG','SE','HA','AS','OU','IO','HE','LE','IN','VE','ER','CO','AN','ME','RE','DE','ON','HI','AT','RI','EN','RO','ND','IC','TI','NE','ES','EA','OR','RA','TE','CE']
-trigrams = ['THE', 'AND', 'ING', 'HER']
+bigram = ['th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar','st','to','nt','ng','se','ha','as','ou','io','he','le','in','ve','er','co','an','me','re','de','on','hi','at','ri','en','ro','nd','ic','ti','ne','es','ea','or','ra','te','ce']
+trigrams = ['the', 'and', 'ing', 'her']
+expected_frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001, 0.120]
+expected_frequency = [0.0] * 10 + expected_frequency + [0.0]
+for i in range(len(alpha)):
+    expected_frequency[i] = [alpha[i], expected_frequency[i]]
+expected_frequency = sorted(expected_frequency, key=lambda x : x[1], reverse=True)
 
 def counter(d, k):
     if k not in d:
@@ -128,11 +133,12 @@ def stats(text: str) -> None:
         fqs = get_freq(text)
         print("\n[ characters ]")
         for i in range(len(freqs)):
-            print(freqs[i][0] + ': ' + str(round(freqs[i][1], 3)),end=' ')
+            print('\t' + freqs[i][0] + ': ' + str(round(freqs[i][1], 3)),end=',\texpected ')
+            print(expected_frequency[i][0] + ': ' + str(round(expected_frequency[i][1], 3)))
         print()
 
-        bis = get_freq(text, seq=2, min_freq=args.min, exclude=args.exclude)
-        tris = get_freq(text, seq=3, min_freq=args.min/2, exclude=args.exclude)
+        bis = get_freq(text, seq=2, min_freq=args.min/3, exclude=args.exclude)
+        tris = get_freq(text, seq=3, min_freq=args.min/3, exclude=args.exclude)
         print("\n-- bigrams --")
         print(bigram)
         print(bis)
