@@ -13,6 +13,8 @@ alpha = list('0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ_#')
 parser = argparse.ArgumentParser(prog = 'crack', description = 'Crack the ciphers of ACry course', epilog = 'Cracking the cipher.')
 parser.add_argument('path', help='the cipher to crack')      # option that takes a value
 parser.add_argument('-v', '--verbose', help='verbosity', action='store_true')
+parser.add_argument('-r', '--rules', help='pre-rules to apply', type=str, default='')
+parser.add_argument('-x', '--exclude', help='exclude character as space', type=str, default='')
 parser.add_argument('-s', '--seq', help='count sequence of n chars', type=int, default=0)
 parser.add_argument('-q', '--question', help='ask to continue', action='store_true')
 parser.add_argument('-f', '--freq', nargs='?', const=2, default=0,  help='frequency table', type=int) 
@@ -26,7 +28,7 @@ args = parser.parse_args()
 frequency = " ETAOINSHRDLCUMWFGYPBVKJXQZ\n"
 alphafreq = "ETAOINSHRDLCUMWFGYPBVKJXQZ"
 bigram = ['TH','HE','IN','ER','AN','RE','ON','AT','EN','ND','TI','ES','OR','TE','OF','ED','IS','IT','AL','AR','ST','TO','NT','NG','SE','HA','AS','OU','IO','HE','LE','IN','VE','ER','CO','AN','ME','RE','DE','ON','HI','AT','RI','EN','RO','ND','IC','TI','NE','ES','EA','OR','RA','TE','CE']
-trigrams = ['THE']
+trigrams = ['THE', 'AND', 'ING', 'HER']
 
 def counter(d, k):
     if k not in d:
@@ -61,6 +63,9 @@ def get_freqtable(text) -> list:
     for i in range(0, len(text)):
         counter(chars, text[i])
     ls = [0.0] * len(alpha)
+    for c in chars:
+        i = alpha.index(c)
+        ls[i] = chars[c] / float(len(text))
     return ls
 
 def intersect_elems(what: str, elems: list):
@@ -83,56 +88,78 @@ def gramalysis(fqs, bis, tris):
             for bi in bis:
                 pass
 
-def printcol(s, colour):
-    print('\033[' + str(colour) + 'm' + s + '\033[0m', end="")
+def printcol(s, colour, end=''):
+    print('\033[' + str(colour) + 'm' + s + '\033[0m', end=end)
+
+def parse_rules(rules, inp):
+    inp = inp.split(',')
+    new = []
+    for e in inp:
+        e = e.split('-')
+        if len(e) > 1:
+            rules[e[0].upper()] = e[1].lower()
+            new.append(e[0].upper())
 
 def stats(text: str) -> None:
     """
         Statistical approach
     """
-    fqs = get_freq(text)
+    fqs = get_freqtable(text)
+    freqs = []
+    for i in range(len(alpha)):
+        freqs.append([alpha[i], fqs[i]])
+    freqs = sorted(freqs, key=lambda x : x[1], reverse=True)[:len(frequency)]
     # Try to exclude one of the tops which should be space
-    mapper = {}
+    rules = {}
     for a in alpha:
-        mapper[a] = a
-    for c in fqs:
+        rules[a] = a
+    parse_rules(rules, args.rules)
+    while True:
         print()
-        bis = get_freq(text, seq=2, min_freq=args.min)
-        tris = get_freq(text, seq=3, min_freq=args.min)
-        printcol("\nmin frequency = " + str(args.min), 7)
+
+        text = list(text)
+        for i in range(len(text)):
+            if text[i].upper() != rules[text[i].upper()]:
+                text[i] = rules[text[i].upper()]
+        text = ''.join(text)
+
+        printcol("\n[ min frequency ] " + str(args.min), 9)
+
+        fqs = get_freq(text)
+        print("\n[ characters ]")
+        for i in range(len(freqs)):
+            print(freqs[i][0] + ': ' + str(round(freqs[i][1], 3)),end=' ')
+        print()
+
+        bis = get_freq(text, seq=2, min_freq=args.min, exclude=args.exclude)
+        tris = get_freq(text, seq=3, min_freq=args.min/2, exclude=args.exclude)
         print("\n-- bigrams --")
         print(bigram)
         print(bis)
         print("\n-- trigrams --")
         print(trigrams)
         print(tris)
-        if args.verbose:
-            for c in text[:args.length]:
-                if c in alpha:
-                    print('\033[31m' + c +'\033[0m', end="")
-                else:
-                    print('\033[33m' + c + '\033[0m', end="")
-            print()
+        for c in text[:args.length]:
+            if c == args.exclude:
+                print(' ', end='')
+                continue
+            if c in alpha:
+                print('\033[31m' + c +'\033[0m', end="")
+            else:
+                print('\033[33m' + c + '\033[0m', end="")
+        print()
         # One of the trigrams is most likely THE (or AND)
+        print("\n--- Rules applied ---")
+        for k in rules:
+            if rules[k].islower():
+                print(k + '-' + rules[k], end=',')
+        print()
         inp = input('\nreplace? [x-y replaces x with y, comma delimits, no ends]\n')
         if inp != 'no':
-            inp = inp.split(',')
-            new = []
-            for e in inp:
-                e = e.split('-')
-                if len(e) > 1:
-                    mapper[e[0].upper()] = e[1].lower()
-                    new.append(e[0].upper())
-            text = list(text)
-            for i in range(len(text)):
-                if text[i].upper() != mapper[text[i].upper()]:
-                    text[i] = mapper[text[i].upper()]
-            text = ''.join(text)
+            parse_rules(rules, inp)
         else:
             break
-    print("\n--- Rules applied ---")
-    for k in mapper:
-        print(k + '-' + mapper[k], end=',')
+    
     
 
 def find_keylen(text: str, max_len: int) -> int:
@@ -180,6 +207,10 @@ def vigenere(text: str, max_len: int = 1000, key_len: int = 0) -> None:
 
 def main():
     text = ''.join(open(args.path, 'r').read().rstrip().split('\n'))
+    if args.exclude:
+        ls = list(map(len, text.split(args.exclude)))
+        print('Average word length: ')
+        print(sum(ls) / float(len(ls)))
     if args.path == '2':
         vigenere(text, args.vigenere, key_len=args.keylen)
     else:
