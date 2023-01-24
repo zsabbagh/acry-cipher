@@ -15,6 +15,7 @@ parser.add_argument('path', help='the cipher to crack')      # option that takes
 parser.add_argument('-v', '--verbose', help='verbosity', action='store_true')
 parser.add_argument('-r', '--rules', help='pre-rules to apply', type=str, default='')
 parser.add_argument('-x', '--exclude', help='exclude character as space', type=str, default='')
+parser.add_argument('--decrypted', help='save decrypted to file', type=str, default='decrypted.data')
 parser.add_argument('-s', '--seq', help='count sequence of n chars', type=int, default=0)
 parser.add_argument('-q', '--question', help='ask to continue', action='store_true')
 parser.add_argument('-f', '--freq', nargs='?', const=2, default=0,  help='frequency table', type=int) 
@@ -27,7 +28,7 @@ args = parser.parse_args()
 
 frequency = " ETAOINSHRDLCUMWFGYPBVKJXQZ\n"
 alphafreq = "ETAOINSHRDLCUMWFGYPBVKJXQZ"
-bigram = ['th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar','st','to','nt','ng','se','ha','as','ou','io','he','le','in','ve','er','co','an','me','re','de','on','hi','at','ri','en','ro','nd','ic','ti','ne','es','ea','or','ra','te','ce']
+bigrams = ['th','he','in','er','an','re','on','at','en','nd','ti','es','or','te','of','ed','is','it','al','ar','st','to','nt','ng','se','ha','as','ou','io','he','le','in','ve','er','co','an','me','re','de','on','hi','at','ri','en','ro','nd','ic','ti','ne','es','ea','or','ra','te','ce']
 trigrams = ['the', 'and', 'ing', 'her', 'hat', 'his', 'tha', 'ere', 'for', 'ent', 'ion', 'ter', 'was']
 expected_frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001, 0.120]
 expected_frequency = [0.0] * 10 + expected_frequency + [0.0]
@@ -52,12 +53,11 @@ def get_freq(text, seq=1, min_freq=0.00, exclude='') -> list:
             if (exclude and exclude not in t) or not exclude:
                 counter(chars, t)
     ls = []
+    total = float(len(text))
     for c in chars:
-        ls.append([c, chars[c] / float(len(text))])
+        if chars[c] / total >= min_freq:
+            ls.append([c, chars[c] / total])
     ls = sorted(ls, key=lambda x : x[1], reverse=True)
-    if min_freq > 0:
-        ls = filter(lambda x : float(x[1]) >= min_freq, ls)
-    ls = [x[0] for x in ls]
     return ls
 
 def get_freqtable(text) -> list:
@@ -104,6 +104,34 @@ def parse_rules(rules, inp):
         if len(e) > 1:
             rules[e[0].upper()] = e[1].lower()
             new.append(e[0].upper())
+        elif len(e[0]) > 1:
+            continue
+        else:
+            rules[e[0].upper()] = e[0].upper() 
+
+def most_common_words(text: str, delimiter: str, min_freq: float = 0.0) -> list:
+    words = text.split(delimiter)
+    count = {}
+    for word in words:
+        counter(count, word)
+    ls = []
+    total = float(len(words))
+    for k in count:
+        if count[k] / total >= min_freq:
+            ls.append([k, count[k] / total])
+    ls = sorted(ls, key=lambda x : x[1], reverse=True)
+    return ls
+
+def apply_rules(text: str, rules: dict):
+    text = list(text)
+    for i in range(len(text)):
+        if args.decrypted and rules[text[i].upper()] == '#':
+            text[i] = '\n'
+            continue
+        if text[i].upper() != rules[text[i].upper()]:
+            text[i] = rules[text[i].upper()]
+    text = ''.join(text)
+    return text
 
 def stats(text: str) -> None:
     """
@@ -118,36 +146,53 @@ def stats(text: str) -> None:
     rules = {}
     for a in alpha:
         rules[a] = a
-    parse_rules(rules, args.rules)
+    if os.path.exists(args.rules):
+        if args.exclude:
+            rules[args.exclude] = ' '
+        parse_rules(rules, open(args.rules,'r').read().rstrip())
+    else:
+        parse_rules(rules, args.rules)
+    if args.decrypted:
+        open(args.decrypted, 'w').write(apply_rules(text, rules))
+        return
     while True:
         print()
 
-        text = list(text)
-        for i in range(len(text)):
-            if text[i].upper() != rules[text[i].upper()]:
-                text[i] = rules[text[i].upper()]
-        text = ''.join(text)
+        demo = apply_rules(text, rules)
 
         printcol("\n[ min frequency ] " + str(args.min), 9)
 
-        fqs = get_freq(text)
+        fqs = get_freq(demo)
         print("\n[ characters ]")
         for i in range(len(freqs)):
-            print('\t' + freqs[i][0] + ': ' + str(round(freqs[i][1], 3)),end=',\texpected ')
+            print('\t' + freqs[i][0] + ': ' + str(round(freqs[i][1], 3)),end='\t\t\t ')
             print(expected_frequency[i][0] + ': ' + str(round(expected_frequency[i][1], 3)))
         print()
 
-        bis = get_freq(text, seq=2, min_freq=args.min/3, exclude=args.exclude)
-        tris = get_freq(text, seq=3, min_freq=args.min/3, exclude=args.exclude)
-        print("\n-- bigrams --")
-        print(bigram)
-        print(bis)
-        print("\n-- trigrams --")
-        print(trigrams)
-        print(tris)
-        for c in text[:args.length]:
+        bis = get_freq(demo, seq=2, min_freq=args.min, exclude=args.exclude)
+        tris = get_freq(demo, seq=3, min_freq=args.min, exclude=args.exclude)
+        print("\n-- bigrams / trigrams --")
+        for i in range(20):
+            bi = bis[i]
+            print('\t',bi[0], ':', round(bi[1], 3), '\t' + bigrams[i], end='')
+            try:
+                tri = tris[i]
+                print('\t\t\t',tri[0], ':', round(tri[1], 3), '\t' + trigrams[i], end='')
+            except:
+                pass
+            print()
+        # Get words
+        words = most_common_words(demo, args.exclude, min_freq=args.min)
+        print("-- most common words --")
+        for i in range(20):
+            word = words[i]
+            print('\t',word[0], '\t:', round(word[1], 3))
+        for c in demo[:args.length]:
             if c == args.exclude:
                 print(' ', end='')
+                continue
+            if c == "#":
+                print()
                 continue
             if c in alpha:
                 print('\033[31m' + c +'\033[0m', end="")
