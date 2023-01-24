@@ -14,7 +14,7 @@ parser = argparse.ArgumentParser(prog = 'crack', description = 'Crack the cipher
 parser.add_argument('path', help='the cipher to crack')      # option that takes a value
 parser.add_argument('-v', '--verbose', help='verbosity', action='store_true')
 parser.add_argument('-r', '--rules', help='pre-rules to apply', type=str, default='')
-parser.add_argument('-x', '--exclude', help='exclude character as space', type=str, default='')
+parser.add_argument('-x', '--delimiter', help='delimiter character as space', type=str, default='')
 parser.add_argument('--decrypted', help='save decrypted to file', type=str, default='decrypted.data')
 parser.add_argument('-s', '--seq', help='count sequence of n chars', type=int, default=0)
 parser.add_argument('-q', '--question', help='ask to continue', action='store_true')
@@ -42,7 +42,7 @@ def counter(d, k):
     else:
         d[k] += 1
 
-def get_freq(text, seq=1, min_freq=0.00, exclude='') -> list:
+def get_freq(text, seq=1, min_freq=0.00, delimiter='') -> list:
     """
         Get characters in a list ordered by frequency
     """
@@ -50,7 +50,7 @@ def get_freq(text, seq=1, min_freq=0.00, exclude='') -> list:
     for i in range(0, len(text)):
         if i-seq+1 >= 0:
             t = text[i-seq+1:i+1]
-            if (exclude and exclude not in t) or not exclude:
+            if (delimiter and delimiter not in t) or not delimiter:
                 counter(chars, t)
     ls = []
     total = float(len(text))
@@ -64,13 +64,11 @@ def get_freqtable(text) -> list:
     """
         Get characters in a list ordered by frequency
     """
-    chars = {}
-    for i in range(0, len(text)):
-        counter(chars, text[i])
     ls = [0.0] * len(alpha)
-    for c in chars:
+    for c in text:
         i = alpha.index(c)
-        ls[i] = chars[c] / float(len(text))
+        ls[i] += 1
+    ls = list(map(lambda x : x / float(len(text)), ls))
     return ls
 
 def intersect_elems(what: str, elems: list):
@@ -102,7 +100,7 @@ def parse_rules(rules, inp):
     for e in inp:
         e = e.split('-')
         if len(e) > 1:
-            rules[e[0].upper()] = e[1].lower()
+            rules[e[0].upper()] = e[1].lower() if e[1] != ' ' else '_'
             new.append(e[0].upper())
         elif len(e[0]) > 1:
             continue
@@ -125,9 +123,6 @@ def most_common_words(text: str, delimiter: str, min_freq: float = 0.0) -> list:
 def apply_rules(text: str, rules: dict):
     text = list(text)
     for i in range(len(text)):
-        if args.decrypted and rules[text[i].upper()] == '#':
-            text[i] = '\n'
-            continue
         if text[i].upper() != rules[text[i].upper()]:
             text[i] = rules[text[i].upper()]
     text = ''.join(text)
@@ -147,13 +142,15 @@ def stats(text: str) -> None:
     for a in alpha:
         rules[a] = a
     if os.path.exists(args.rules):
-        if args.exclude:
-            rules[args.exclude] = ' '
+        if args.delimiter:
+            rules[args.delimiter] = ' '
         parse_rules(rules, open(args.rules,'r').read().rstrip())
     else:
         parse_rules(rules, args.rules)
     if args.decrypted:
-        open(args.decrypted, 'w').write(apply_rules(text, rules))
+        dec = apply_rules(text, rules).upper()
+        print(dec)
+        open(args.decrypted, 'w').write(dec)
         return
     while True:
         print()
@@ -169,8 +166,8 @@ def stats(text: str) -> None:
             print(expected_frequency[i][0] + ': ' + str(round(expected_frequency[i][1], 3)))
         print()
 
-        bis = get_freq(demo, seq=2, min_freq=args.min, exclude=args.exclude)
-        tris = get_freq(demo, seq=3, min_freq=args.min, exclude=args.exclude)
+        bis = get_freq(demo, seq=2, min_freq=args.min, delimiter=args.delimiter)
+        tris = get_freq(demo, seq=3, min_freq=args.min, delimiter=args.delimiter)
         print("\n-- bigrams / trigrams --")
         for i in range(20):
             bi = bis[i]
@@ -182,13 +179,13 @@ def stats(text: str) -> None:
                 pass
             print()
         # Get words
-        words = most_common_words(demo, args.exclude, min_freq=args.min)
+        words = most_common_words(demo, args.delimiter, min_freq=args.min)
         print("-- most common words --")
         for i in range(20):
             word = words[i]
             print('\t',word[0], '\t:', round(word[1], 3))
         for c in demo[:args.length]:
-            if c == args.exclude:
+            if c == args.delimiter:
                 print(' ', end='')
                 continue
             if c == "#":
@@ -210,8 +207,6 @@ def stats(text: str) -> None:
             parse_rules(rules, inp)
         else:
             break
-    
-    
 
 def find_keylen(text: str, max_len: int) -> int:
     occ = []
@@ -231,6 +226,17 @@ def find_keylen(text: str, max_len: int) -> int:
     key_len = keys[-1][0] if keys[-1][0] != 0 else keys[-2][0]
     return key_len
 
+def shifter(text: str, shift_amount: int = None, direction: str = 'L', key: list = None) -> list:
+    shifted = []
+    i = 0
+    for c in text:
+        if key is not None:
+            v = i % len(key) 
+            shift_amount = key[v] if type(key[v]) == int else alpha.index(key[v])
+        shifted.append(alpha[(alpha.index(c) + (- shift_amount if direction == 'L' else shift_amount)) % len(alpha)])
+        i += 1
+    return shifted
+
 def vigenere(text: str, max_len: int = 1000, key_len: int = 0) -> None:
     # First find key length
     if not max_len:
@@ -239,27 +245,43 @@ def vigenere(text: str, max_len: int = 1000, key_len: int = 0) -> None:
         key_len = find_keylen(text, max_len)
     print('Chosen key length is ', key_len)
     # Add modulo
-    mods = [[]] * key_len
+    modgroups = [None]*key_len
     for i in range(len(text)):
-        mods[i % key_len].append(text[i])
-    mods = list(map(''.join, mods))
-    freqs = list(map(get_freq, mods))
+        v = i % key_len
+        if modgroups[v] is None:
+            modgroups[v] = [text[i]]
+        else:
+            modgroups[v].append(text[i])
+    modgroups = list(map(''.join, modgroups))
     # For each mod, check frequency and deviation from 
     # Space starts frequency, then it is ABC... etc
-    frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001]
-    space = 0.120
+    frequency = [0.072, 0.013, 0.024, 0.037, 0.112, 0.02, 0.018, 0.054, 0.061, 0.001, 0.007, 0.035, 0.021, 0.058, 0.066, 0.017, 0.001, 0.053, 0.056, 0.08, 0.024, 0.009, 0.021, 0.001, 0.017, 0.001, 0.12]
     # Assume numbers do not occur often, neither newline
-    frequency = np.array([0.0] * 10 + frequency + space + [0.0])
-    # Go through all characters
+    frequency = np.array([0.0] * 10 + frequency + [0.0])
+    # Go through each group and find expected jumps
+    shift_probabilities = {}
     for i in range(key_len):
-        mod = mods[i]
-        for shift in range(len(alpha)):
-            pass
+        group = copy.deepcopy(modgroups[i])
+        points = [0] * len(alpha)
+        for shift_amount in range(len(alpha)):
+            shifted = shifter(group, shift_amount)
+            shifted_table = np.array(get_freqtable(shifted))
+            points[shift_amount] = [shift_amount, np.dot(frequency, shifted_table)]
+        points = sorted(points, key=lambda x : x[1], reverse=True)
+        shift_probabilities[i] = points
+    key = [None] * key_len
+    for k in shift_probabilities:
+        key[k] = shift_probabilities[k][0][0]
+    decrypted = ''.join(shifter(text, key=key))
+    print(decrypted)
+    print(len(decrypted))
+
+
 
 def main():
     text = ''.join(open(args.path, 'r').read().rstrip().split('\n'))
-    if args.exclude:
-        ls = list(map(len, text.split(args.exclude)))
+    if args.delimiter:
+        ls = list(map(len, text.split(args.delimiter)))
         print('Average word length: ')
         print(sum(ls) / float(len(ls)))
     if args.path == '2':
