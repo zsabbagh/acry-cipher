@@ -274,7 +274,8 @@ def vigenere(text: str, max_len: int = 1000, key_len: int = 0) -> None:
         key[k] = shift_probabilities[k][0][0]
     decrypted = ''.join(shifter(text, key=key))
     print(decrypted)
-    print(len(decrypted))
+    print("Key used:")
+    print(''.join([ alpha[k] for k in key ]))
 
 
 
