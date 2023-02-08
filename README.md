@@ -1,2 +1,3 @@
-# acry-cipher
-Cipher for Applied Crypto
+# Applied Cryptography
+
+Cipher-cracker for Applied Crypto
